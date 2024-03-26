@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "0ea40e77c07ea586d768c874d304b5c5",
+    "content-hash": "b5aab6191cdf471eac9ec0efe3fd2178",
     "packages": [
         {
             "name": "composer/semver",
@@ -1304,6 +1304,16 @@
                 "source": "https://github.com/doctrine/sql-formatter/tree/1.2.0"
             },
             "time": "2023-08-16T21:49:04+00:00"
+        },
+        {
+            "name": "eaws/eaws-regions",
+            "version": "dev-master",
+            "source": {
+                "type": "git",
+                "url": "https://gitlab.com/eaws/eaws-regions.git",
+                "reference": "origin/master"
+            },
+            "type": "eaws-library"
         },
         {
             "name": "egulias/email-validator",
@@ -9696,7 +9706,9 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": [],
+    "stability-flags": {
+        "eaws/eaws-regions": 20
+    },
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {
