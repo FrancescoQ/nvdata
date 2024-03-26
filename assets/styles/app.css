@@ -1,0 +1,27 @@
+body {
+    background-color: skyblue;
+    font-family: Helpvetica, Arial, sans-serif;
+}
+
+.content {
+    padding: 20px;
+}
+
+.links-column {
+    column-count: 4;
+
+    &, li {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    a {
+        color: black;
+
+        &:hover {
+            color: darkslategray;
+            text-decoration-color: darkslategray;
+        }
+    }
+}

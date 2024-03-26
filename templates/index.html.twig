@@ -1,0 +1,17 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}NV Data{% endblock %}
+
+{% block body %}
+  <h1>Neve/Valanghe data</h1>
+
+  {% for provider, provider_links in links %}
+    <h2>Data from {{ provider }}</h2>
+    <ul class="links-column">
+      {% for name, url in provider_links %}
+        <li><a target="_blank" href="{{ url }}">{{ name }}</a></li>
+      {% endfor %}
+    </ul>
+  {% endfor %}
+
+{% endblock %}
