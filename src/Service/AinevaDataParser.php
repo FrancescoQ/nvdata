@@ -41,15 +41,21 @@ class AinevaDataParser {
     $this->ainevaRegions = $ainevaRegions;
     $this->normalizer = $normalizer;
     $this->content = NULL;
-    $url = 'https://bollettini.aineva.it/albina_files/latest/it.xml';
-    $response = $this->client->request('GET', $url);
+    $response = $this->client->request('GET', $_ENV['AINEVA_URL']);
     $statusCode = $response->getStatusCode();
     if ($statusCode === 200) {
       $this->content = $response->getContent();
     }
   }
 
-  public function getBulletins($load = FALSE) {
+  /**
+   * Retrieve the Aineva Bulletins for all the regions.
+   *
+   * @param bool $load
+   *
+   * @return array
+   */
+  public function getBulletins(bool $load = FALSE): array {
     $bulletins = [];
     if (!$this->content) {
       return $bulletins;

@@ -36,7 +36,9 @@ class Index extends AbstractController {
   public function index(): Response {
 
     $links = [
-      'ARPAV' => ['ARPAV' => $this->router->generate('arpav_data')],
+      'ARPAV' => [
+        'ARPAV' => $this->router->generate('arpav_data')
+      ],
     ];
 
     $regions = $this->ainevaRegions->getRegions();

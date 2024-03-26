@@ -34,7 +34,7 @@ class ArpavDataParser {
    */
   public function getData(): array {
     $data = [];
-    $response = $this->client->request('GET', 'https://meteo.arpa.veneto.it/meteo/bollettini_nv/it/xml/dolomiti_nevevalanghe.xml');
+    $response = $this->client->request('GET', $_ENV['ARPAV_URL']);
     $statusCode = $response->getStatusCode();
     if ($statusCode === 200) {
       $content = $response->getContent();
