@@ -51,6 +51,8 @@ class Index extends AbstractController {
       $links['AINEVA'][$region_name] = $this->router->generate('aineva_data', ['region' => $region_id]);
     }
 
+    $tree = $this->ainevaRegions->getRegionTree();
+
     return $this->render('index.html.twig', ['links' => $links]);
   }
 }
