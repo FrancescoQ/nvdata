@@ -46,7 +46,6 @@ class AinevaRegions {
   public function getRegionTree() {
     $tree = [];
     $regions = $this->getRegions();
-
     foreach ($regions as $code => $region) {
       $code_parts = explode('-', $code);
       $parts_count = count($code_parts);
@@ -61,6 +60,9 @@ class AinevaRegions {
       }
       elseif ($parts_count === 4) {
         $tree[$code_parts[0]]['regions'][implode('-', [$code_parts[0], $code_parts[1]])]['regions'][implode('-', [$code_parts[0], $code_parts[1], $code_parts[2]])]['regions'][$code] = ['name' => $region];
+      }
+      elseif ($parts_count === 5) {
+        $tree[$code_parts[0]]['regions'][implode('-', [$code_parts[0], $code_parts[1]])]['regions'][implode('-', [$code_parts[0], $code_parts[1], $code_parts[2]])]['regions'][implode('-', [$code_parts[0], $code_parts[1], $code_parts[2], $code_parts[3]])]['regions'][$code] = ['name' => $region];
       }
     }
     return $tree;
