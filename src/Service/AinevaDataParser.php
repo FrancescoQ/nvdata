@@ -35,11 +35,17 @@ class AinevaDataParser {
    */
   private $normalizer;
 
-  public function __construct(LoggerInterface $logger, HttpClientInterface $httpClient, AinevaRegions $ainevaRegions, nvDataNormalizer $normalizer) {
+  /**
+   * @var \App\Service\CrawlerUtilities
+   */
+  private $crawlerUtilities;
+
+  public function __construct(LoggerInterface $logger, HttpClientInterface $httpClient, AinevaRegions $ainevaRegions, nvDataNormalizer $normalizer, CrawlerUtilities $crawlerUtilities) {
     $this->logger = $logger;
     $this->client = $httpClient;
     $this->ainevaRegions = $ainevaRegions;
     $this->normalizer = $normalizer;
+    $this->crawlerUtilities = $crawlerUtilities;
     $this->content = NULL;
     $response = $this->client->request('GET', $_ENV['AINEVA_URL']);
     $statusCode = $response->getStatusCode();
@@ -97,80 +103,108 @@ class AinevaDataParser {
 
     $data['region_id'] = $region;
     $data['region_name'] = $this->ainevaRegions->getRegionName($region);
-    $data['report_time'] = $bulletin->filter('default|dateTimeReport')->innerText();;
-    $data['start_time'] = $bulletin->filter('default|TimePeriod default|beginPosition')->innerText();;
-    $data['end_time'] = $bulletin->filter('default|TimePeriod default|endPosition')->innerText();;
+    $data['report_time'] = $this->crawlerUtilities->getText($bulletin, 'default|dateTimeReport');
+    $data['start_time'] = $this->crawlerUtilities->getText($bulletin, 'default|TimePeriod default|beginPosition');
+    $data['end_time'] = $this->crawlerUtilities->getText($bulletin, 'default|TimePeriod default|endPosition');
 
     // Locations of the bulletin.
-    $data['locations'] = $bulletin->filter('default|locRef')->each(function ($locRef, $i) {
-      $loc_id = $locRef->getNode(0)->getAttribute('xlink:href');
+    $locations = $bulletin->filter('default|locRef')->each(function ($locRef, $i) {
+      $loc_id = $this->crawlerUtilities->getAttribute($locRef, 'xlink:href');
+      if (!$loc_id) {
+        return ['id' => NULL, 'name' => NULL];
+      }
       $loc_name = $this->ainevaRegions->getRegionName($loc_id);
       return ['id' => $loc_id, 'name' => $loc_name];
     });
 
+    // Filter out empty locations
+    $data['locations'] = array_filter($locations, function($item) {
+      return !empty($item['id']);
+    });
+
     // Generic danger ratings.
     $data['ratings'] = $bulletin->filter('default|DangerRating')->each(function (Crawler $dangerRating) {
-      $elevation_attribute = $dangerRating->filter('default|validElevation')->getNode(0)->getAttribute('xlink:href');
-      // Remove the prefix.
-      $elevation_attribute = str_replace('ElevationRange_', '', $elevation_attribute);
-      // Get the direction.
-      $direction_suffix = substr($elevation_attribute, -2);
-      $direction = $direction_suffix === 'Hi' ? 'up' : 'down';
-
-      // The remaining part is the elevation.
-      $elevation = substr($elevation_attribute, 0, -2);
+      $elevation_data = $this->getElevationData($dangerRating->filter('default|validElevation'));
 
       // The only visible text is the danger rating, so we can use the entire
       // node text as the value.
       $danger_value = $dangerRating->text();
-      return ['elevation' => $elevation, 'direction' => $direction, 'value' => $danger_value];
+      return ['elevation' => $elevation_data['elevation'], 'direction' => $elevation_data['direction'], 'value' => $danger_value];
     });
 
     // Danger patterns.
     // @see https://bollettini.aineva.it/education/danger-patterns
-    $data['danger_patterns'] = $bulletin->filter('default|DangerPattern')->each(function (Crawler $dangerPattern) {
-      $danger_pattern_code = $dangerPattern->text();
+    $danger_patterns = $bulletin->filter('default|DangerPattern')->each(function (Crawler $dangerPattern) {
+      $danger_pattern_code = $this->crawlerUtilities->getText($dangerPattern);
+      if (!$danger_pattern_code) {
+        return ['code' => NULL, 'description' => NULL];
+      }
       $danger_pattern = $this->dangerPatterns($danger_pattern_code);
       return ['code' => $danger_pattern_code, 'description' => $danger_pattern];
     });
 
+    $data['danger_patterns'] = array_filter($danger_patterns, function ($item) {
+      return !empty($item['code']);
+    });
+
     // Avalanche problems.
     $data['problems'] = $bulletin->filter('default|AvProblem')->each(function (Crawler $avProblem) {
-      $problem_type = $avProblem->text();
-      $elevation_attribute = $avProblem->filter('default|validElevation')->getNode(0)->getAttribute('xlink:href');
-      // Remove the prefix.
-      $elevation_attribute = str_replace('ElevationRange_', '', $elevation_attribute);
-      // Get the direction.
-      $direction_suffix = substr($elevation_attribute, -2);
-      $direction = $direction_suffix === 'Hi' ? 'up' : 'down';
-
-      // The remaining part is the elevation.
-      $elevation = substr($elevation_attribute, 0, -2);
+      $problem_type = $this->crawlerUtilities->getText($avProblem);
+      $elevation_data = $this->getElevationData($avProblem->filter('default|validElevation'));
 
       $orientations = $avProblem->filter('default|validAspect')->each(function(Crawler $validAspect) {
-        $aspect_attribute = $validAspect->getNode(0)->getAttribute('xlink:href');
+        $aspect_attribute = $this->crawlerUtilities->getAttribute($validAspect, 'xlink:href');
         return str_replace('AspectRange_', '', $aspect_attribute);
       });
-      return ['type' => $problem_type, 'orientations' => $orientations, 'elevation' => $elevation, 'direction' => $direction];
+      return ['type' => $problem_type, 'orientations' => $orientations, 'elevation' => $elevation_data['elevation'], 'direction' => $elevation_data['direction']];
     });
 
     // Textual descriptions.
-    $data['highlight'] = $bulletin->filter('default|avActivityHighlights')->text();
-    $data['description'] = $bulletin->filter('default|avActivityComment')->text();
-    $data['snow_description'] = $bulletin->filter('default|snowpackStructureComment')->text();
+    $data['highlight'] = $this->crawlerUtilities->getText($bulletin, 'default|avActivityHighlights');
+    $data['description'] = $this->crawlerUtilities->getText($bulletin, 'default|avActivityComment');
+    $data['snow_description'] = $this->crawlerUtilities->getText($bulletin, 'default|snowpackStructureComment');
 
     // Forecast / tendency
-    $data['tendency']['type'] = $bulletin->filter('default|tendency default|type')->text();
-    $data['tendency']['from'] = $bulletin->filter('default|tendency default|beginPosition')->text();
-    $data['tendency']['to'] = $bulletin->filter('default|tendency default|endPosition')->text();
-    $data['tendency']['tendencyComment'] = $bulletin->filter('default|snowpackStructureComment')->text();
+    $data['tendency']['type'] = $this->crawlerUtilities->getText($bulletin, 'default|tendency default|type');
+    $data['tendency']['from'] = $this->crawlerUtilities->getText($bulletin, 'default|tendency default|beginPosition');
+    $data['tendency']['to'] = $this->crawlerUtilities->getText($bulletin, 'default|tendency default|endPosition');
+    $data['tendency']['tendencyComment'] = $this->crawlerUtilities->getText($bulletin, 'default|snowpackStructureComment');
 
     $data['credits'] = 'AINEVA - https://bollettini.aineva.it/more/open-data';
 
     return $this->normalizer->normalizeAineva($data);
   }
 
-  private function dangerPatterns($code = '') {
+  /**
+   * Elevation data is handled always in the same way, and we need to manipulate
+   * a bit the attribute value we get, to extract elevation and direction.
+   *
+   * @param \Symfony\Component\DomCrawler\Crawler $crawler
+   *
+   * @return array
+   */
+  private function getElevationData(Crawler $crawler): array {
+    $elevation_attribute = $this->crawlerUtilities->getAttribute($crawler, 'xlink:href');
+
+    // Remove the prefix.
+    $elevation_attribute = str_replace('ElevationRange_', '', $elevation_attribute);
+
+    // Get the direction.
+    $direction_suffix = substr($elevation_attribute, -2);
+    $direction = $direction_suffix === 'Hi' ? 'up' : 'down';
+
+    // The remaining part is the elevation.
+    $elevation = substr($elevation_attribute, 0, -2);
+
+    return ['elevation' => $elevation, 'direction' => $direction];
+  }
+
+  /**
+   * @param string $code
+   *
+   * @return string|string[]
+   */
+  private function dangerPatterns(string $code = ''): array|string {
     $map = [
       'DP1' => 'Strato debole persistente basale',
       'DP2' => 'Valanga per scivolamento di neve',
