@@ -191,7 +191,7 @@ class AinevaDataParser {
 
     // Get the direction.
     $direction_suffix = substr($elevation_attribute, -2);
-    $direction = $direction_suffix === 'Hi' ? 'up' : 'down';
+    $direction = $direction_suffix === 'Hi' ? '>' : '<';
 
     // The remaining part is the elevation.
     $elevation = substr($elevation_attribute, 0, -2);

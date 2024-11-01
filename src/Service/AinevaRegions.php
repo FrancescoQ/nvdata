@@ -70,7 +70,6 @@ class AinevaRegions {
     ];
 
     $regions = [];
-    $regions[] = 'pluto';
     $finder = new Finder();
     $finder->in($this->baseDir . 'micro-regions');
     foreach ($finder->files()->name('*.json')->contains('FeatureCollection') as $item) {
